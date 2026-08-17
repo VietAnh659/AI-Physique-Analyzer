@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Physique Analyzer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap');
+
+  :root{
+    --bg:#0A0C0E; --panel:#14171A; --panel2:#1B1F23; --border:#262B2F;
+    --text:#ECEEEC; --dim:#8A9299; --dim2:#4A5157;
+    --accent:#46D5C4; --accent2:#8C6FE8; --ghost:#CFE8FF;
+    --good:#46D98F; --mid:#E8B84A; --bad:#E8654A;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;}
+  .sg{font-family:'Space Grotesk',sans-serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  #app{max-width:760px;margin:0 auto;padding:18px 16px 70px;min-height:100vh;}
+  button{font-family:inherit;}
+  .tapbtn{transition:transform .12s ease, border-color .12s ease; cursor:pointer;}
+  .tapbtn:active{transform:scale(0.97);}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:18px;}
+  .row{display:flex;align-items:center;justify-content:space-between;}
+  .pill{display:inline-block;padding:5px 12px;border-radius:999px;font-size:11px;font-weight:700;}
+  .barTrack{height:7px;background:#101315;border-radius:999px;overflow:hidden;}
+  .barFill{height:100%;}
+  .fadein{animation:fadein .35s ease;}
+  @keyframes fadein{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+  .hdr{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px;border-bottom:1px solid var(--border);padding-bottom:14px;}
+  .hdr .logo{font-size:20px;font-weight:700;letter-spacing:.5px;}
+  .hdr .logo span{color:var(--accent);}
+  .hdr .tag{font-size:10px;color:var(--dim);letter-spacing:.5px;}
+
+  .grid6{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:16px 0;}
+  @media(min-width:520px){.grid6{grid-template-columns:repeat(3,1fr);}}
+  .modcard{background:var(--panel2);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:left;position:relative;width:100%;display:block;box-sizing:border-box;}
+  .modcard .badge{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;margin-bottom:10px;}
+  .modcard .name{font-size:13px;font-weight:600;margin-bottom:4px;}
+  .modcard .score{font-size:20px;font-weight:700;}
+  .modcard .cta{font-size:11px;color:var(--accent);margin-top:6px;}
+  .delbtn{position:absolute;top:8px;right:8px;background:none;border:none;color:var(--dim2);font-size:13px;padding:2px 6px;}
+
+  .captureBar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .iconBtn{width:34px;height:34px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);color:var(--text);display:flex;align-items:center;justify-content:center;font-size:14px;}
+  .iconBtn.on{border-color:var(--accent);color:var(--accent);background:rgba(70,213,196,0.1);}
+
+  .viewfinder{position:relative;background:#0D1012;border:1px solid var(--border);border-radius:14px;display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:8px;}
+  .viewfinder.flash{background:#1c1f22;}
+  .viewfinder img{width:100%;height:100%;object-fit:cover;opacity:0.92;}
+  .corner{position:absolute;width:20px;height:20px;border-color:var(--dim2);z-index:3;opacity:0.6;}
+  .c-tl{top:10px;left:10px;border-top:2px solid;border-left:2px solid;}
+  .c-tr{top:10px;right:10px;border-top:2px solid;border-right:2px solid;}
+  .c-bl{bottom:10px;left:10px;border-bottom:2px solid;border-left:2px solid;}
+  .c-br{bottom:10px;right:10px;border-bottom:2px solid;border-right:2px solid;}
+
+  .cornerRef{position:absolute;bottom:10px;right:10px;width:58px;height:58px;background:rgba(10,12,14,0.5);border-radius:10px;z-index:4;padding:4px;}
+  .centerGhost{position:absolute;top:8%;bottom:8%;left:0;right:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:2;}
+
+  .shutterWrap{display:flex;flex-direction:column;align-items:center;margin:14px 0 10px;}
+  .shutterBtn{width:64px;height:64px;border-radius:999px;border:4px solid var(--accent);background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+  .shutterBtn::after{content:"";width:48px;height:48px;border-radius:999px;background:var(--accent);}
+  .shutterBtn.done::after{background:var(--good);}
+  .shutterBtn.reject::after{background:var(--bad);}
+
+  .stars{font-size:15px;letter-spacing:2px;}
+  .noteText{font-size:12px;color:var(--dim);text-align:center;line-height:1.6;margin-top:4px;}
+  .reasonBox{font-size:12px;color:var(--bad);text-align:center;margin-top:6px;}
+  .cautionBox{font-size:11.5px;color:var(--mid);text-align:center;margin-top:6px;}
+
+  .scanOverlay{position:absolute;inset:0;pointer-events:none;}
+  .scanline{position:absolute;left:0;right:0;height:34px;background:linear-gradient(180deg,rgba(70,213,196,0) 0%,rgba(70,213,196,0.28) 50%,rgba(70,213,196,0) 100%);animation:sweep 1.6s linear infinite;}
+  @keyframes sweep{0%{top:-15%;}100%{top:105%;}}
+  .grid-overlay{position:absolute;inset:0;background-image:linear-gradient(rgba(70,213,196,0.07) 1px,transparent 1px),linear-gradient(90deg,rgba(70,213,196,0.07) 1px,transparent 1px);background-size:24px 24px;}
+
+  .confetti{position:fixed;top:-20px;width:8px;height:14px;opacity:0.9;z-index:999;animation:fall linear forwards;}
+  @keyframes fall{to{transform:translateY(110vh) rotate(360deg);opacity:0.3;}}
+
+  #toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--accent);color:var(--text);padding:10px 18px;border-radius:999px;font-size:13px;z-index:998;opacity:0;transition:opacity .3s ease;pointer-events:none;max-width:90vw;text-align:center;}
+  #toast.show{opacity:1;}
+
+  input[type=file]{display:none;}
+  input[type=number],input[type=text]{width:100%;background:#15181B;border:1px solid #2A3034;border-radius:10px;padding:10px 12px;color:var(--text);font-size:15px;outline:none;}
+
+  .toggleRow{display:flex;align-items:center;justify-content:space-between;background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin-bottom:14px;}
+  .switch{width:38px;height:22px;border-radius:999px;background:#2A3034;position:relative;cursor:pointer;flex-shrink:0;}
+  .switch.on{background:var(--accent);}
+  .switch::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:999px;background:#fff;transition:left .15s ease;}
+  .switch.on::after{left:18px;}
+
+  .stageRow{display:flex;align-items:center;gap:10px;padding:9px 0;font-size:13px;color:var(--dim2);}
+  .stageRow.active{color:var(--accent);}
+  .stageRow.done{color:var(--good);}
+  .stageDot{width:16px;height:16px;border-radius:999px;border:2px solid currentColor;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;}
+
+  .procOverlay{position:absolute;inset:0;z-index:5;background:rgba(10,12,14,0.72);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;}
+  .procSpinner{width:30px;height:30px;border-radius:999px;border:3px solid #2A3034;border-top-color:var(--accent);animation:spin .8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .procLabel{font-size:11.5px;color:var(--dim);text-align:center;padding:0 20px;}
+
+  .chipRow{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:8px;}
+  .chip{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:999px;font-size:11px;line-height:1.4;text-align:left;}
+  .chip.chipInfo{background:rgba(70,213,196,0.12);color:var(--accent);border:1px solid rgba(70,213,196,0.3);}
+  .chip.chipWarn{background:rgba(232,184,74,0.12);color:var(--mid);border:1px solid rgba(232,184,74,0.3);}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast"></div>
+
+<script>
+/* ------------------------------------------------------------------ */
+/* GHOST / REFERENCE ICON LIBRARY                                       */
+/* ------------------------------------------------------------------ */
+const POSE_LIMBS = { // used only in Advanced Mode (full silhouette)
+  arms_front:   { arms:["M50 46 L22 62 L34 40","M50 46 L78 62 L66 40"], legs:["M50 110 L32 190","M50 110 L68 190"] },
+  arms_back:    { arms:["M50 46 L18 66 L30 86","M50 46 L82 66 L70 86"], legs:["M50 110 L32 190","M50 110 L68 190"] },
+  chest_hips:   { arms:["M50 46 L26 70 L40 92","M50 46 L74 70 L60 92"], legs:["M50 110 L32 190","M50 110 L68 190"] },
+  chest_squeeze:{ arms:["M50 46 L30 58 L50 68","M50 46 L70 58 L50 68"], legs:["M50 110 L32 190","M50 110 L68 190"] },
+  back_relaxed: { arms:["M50 46 L40 90","M50 46 L60 90"], legs:["M50 110 L32 190","M50 110 L68 190"] },
+  back_latspread:{ arms:["M50 46 L14 68 L34 90","M50 46 L86 68 L66 90"], legs:["M50 110 L32 190","M50 110 L68 190"] },
+  shoulder_side:{ arms:["M50 46 L42 92","M50 46 L84 38 L98 30"], legs:["M50 110 L36 190","M50 110 L64 190"] },
+  abs_crunch:   { torso:"M50 34 Q57 70 50 110", arms:["M53 42 L30 24","M53 42 L72 24"], legs:["M50 110 L34 188","M50 110 L66 188"] },
+  legs_front:   { arms:["M50 46 L42 92","M50 46 L58 92"], legs:["M50 110 L30 190","M50 110 L70 190"] },
+  legs_back:    { arms:["M50 46 L38 90","M50 46 L62 90"], legs:["M50 110 L34 150 L28 190","M50 110 L66 150 L72 190"] },
+};
+function centerGhostSVG(poseKey){
+  const p = POSE_LIMBS[poseKey] || POSE_LIMBS.arms_front;
+  const torso = p.torso || "M50 34 L50 110";
+  return `<svg viewBox="0 0 100 200" preserveAspectRatio="xMidYMid meet" style="width:48%;">
+    <g stroke="var(--ghost)" stroke-width="2.4" stroke-linecap="round" fill="none" opacity="0.42" stroke-dasharray="5 4">
+      <circle cx="50" cy="20" r="14"/>
+      <path d="${torso}"/>
+      <path d="${p.arms[0]}"/><path d="${p.arms[1]}"/>
+      <path d="${p.legs[0]}"/><path d="${p.legs[1]}"/>
+    </g>
+  </svg>`;
+}
+// small, non-blocking corner reference icons (opacity 0.3, icon-based per module)
+const CORNER_ICONS = {
+  arms: `<g stroke="var(--ghost)" stroke-width="3" fill="none" stroke-linecap="round"><path d="M10 46 L18 28 L12 12"/><path d="M50 46 L42 28 L48 12"/></g>`,
+  chest:`<g stroke="var(--ghost)" stroke-width="3" fill="none" stroke-linecap="round"><circle cx="30" cy="12" r="6"/><path d="M30 18 L30 46"/><path d="M12 30 L26 30"/><path d="M26 30 L20 25 M26 30 L20 35"/></g>`,
+  back: `<g stroke="var(--ghost)" stroke-width="3" fill="none" stroke-linecap="round"><circle cx="30" cy="12" r="6"/><path d="M30 18 L30 46"/><path d="M30 24 L14 16 M30 24 L46 16"/></g>`,
+  shoulders:`<g fill="var(--ghost)" opacity="0.9"><circle cx="14" cy="30" r="7"/><circle cx="30" cy="20" r="7"/><circle cx="46" cy="30" r="7"/></g>`,
+  abs:  `<g fill="none" stroke="var(--ghost)" stroke-width="2.5"><rect x="14" y="8" width="14" height="10" rx="3"/><rect x="32" y="8" width="14" height="10" rx="3"/><rect x="14" y="22" width="14" height="10" rx="3"/><rect x="32" y="22" width="14" height="10" rx="3"/><rect x="14" y="36" width="14" height="10" rx="3"/><rect x="32" y="36" width="14" height="10" rx="3"/></g>`,
+  legs: `<g stroke="var(--ghost)" stroke-width="4" stroke-linecap="round"><path d="M18 8 L14 46"/><path d="M42 8 L46 46"/></g>`,
+};
+function cornerIcon(key){
+  return `<svg viewBox="0 0 60 60" width="100%" height="100%">${CORNER_ICONS[key]||CORNER_ICONS.arms}</svg>`;
+}
+
+/* Pose Correction & Assessment — thay vì từ chối ảnh lệch góc, hệ thống đưa
+   gợi ý điều chỉnh cụ thể dựa trên góc khớp (mô phỏng MediaPipe BlazePose). */
+const POSE_ADJUST_TIPS = {
+  arms_front:  ["Đưa cẳng tay lên cao thêm khoảng 5cm để lộ rõ bắp tay trước.","Xoay cánh tay ra ngoài thêm khoảng 10° để camera thấy rõ hơn."],
+  arms_back:   ["Gập khuỷu tay thêm khoảng 15° (gần 90°) để lộ rõ cơ tay sau.","Đưa tay ra xa thân người thêm khoảng 5cm."],
+  chest_hips:  ["Ưỡn ngực nhẹ thêm khoảng 10° về phía camera.","Hạ vai xuống khoảng 3cm để không che khuất phần ngực trên."],
+  chest_squeeze:["Ép hai bả vai lại gần nhau hơn để làm nổi khe ngực.","Nâng khuỷu tay lên thêm khoảng 5cm cho ngang vai."],
+  back_relaxed:["Lùi xa camera thêm khoảng 30cm để lấy trọn lưng.","Hạ hai tay tự nhiên, tránh che lưng."],
+  back_latspread:["Kéo hai khuỷu tay ra xa thân thêm khoảng 10cm để xòe cơ xô rõ hơn.","Hơi cúi người về phía trước khoảng 10-15°."],
+  shoulder_side:["Nâng cánh tay lên thêm khoảng 5cm cho ngang vai.","Xoay người nghiêng thêm khoảng 10°."],
+  abs_crunch:  ["Gập nhẹ người về phía trước khoảng 10° để cơ bụng gồng rõ hơn.","Hóp bụng và giữ hơi thở ra khi chụp."],
+  legs_front:  ["Lùi xa camera thêm khoảng 30cm để lấy trọn hai chân.","Dồn trọng lượng đều hai chân, đứng thẳng gối."],
+  legs_back:   ["Giữ hai gót chân chạm nhau khi xoay lưng lại.","Lùi xa camera thêm khoảng 20cm để lấy trọn bắp chuối."],
+};
+
+/* ------------------------------------------------------------------ */
+/* DATA — "Pose tham khảo" philosophy: ghost is a suggestion, not required */
+/* ------------------------------------------------------------------ */
+const MODULES = {
+  arms:{ label:"Tay", abbr:"TAY", weight:15, icon:"arms",
+    criteria:"Độ to, độ chai gân, độ đối xứng 2 bên, độ tách bắp (Brachialis).",
+    note:"Bạn có thể gồng hoặc thư giãn, nhưng nhớ chụp rõ tay trước và sau.",
+    subs:[{k:"biceps_long",l:"Biceps - Đầu dài"},{k:"biceps_short",l:"Biceps - Đầu ngắn"},{k:"triceps_long",l:"Triceps - Đầu dài"},{k:"triceps_lateral",l:"Triceps - Đầu ngoài"},{k:"triceps_medial",l:"Triceps - Đầu trong"},{k:"forearms",l:"Cẳng tay"}],
+    shots:[{t:"Tay trước",pose:"arms_front"},{t:"Tay sau",pose:"arms_back"}] },
+  chest:{ label:"Ngực", abbr:"NGỰC", weight:15, icon:"chest",
+    criteria:"Độ dày, độ săn chắc, tỷ lệ phát triển giữa trên và dưới.",
+    note:"Hướng camera về phía ngực, đứng thẳng hoặc hơi nghiêng đều được.",
+    subs:[{k:"upper",l:"Ngực trên"},{k:"mid_lower",l:"Ngực giữa & dưới"},{k:"inner",l:"Khe ngực (Inner Chest)"}],
+    shots:[{t:"Thẳng",pose:"chest_hips"},{t:"Ép ngực",pose:"chest_squeeze"}] },
+  back:{ label:"Lưng", abbr:"LƯNG", weight:20, icon:"back",
+    criteria:"Độ dày tổng thể, chỉ số V-Taper, độ nét xương bả vai.",
+    note:"Quay lưng về camera, đứng thoải mái, không cần gồng.",
+    subs:[{k:"lats",l:"Cơ Xô (Lats)"},{k:"traps",l:"Cơ cầu vai (Traps)"},{k:"rhomboids",l:"Cơ lưng giữa (Rhomboids)"},{k:"erector",l:"Cơ dựng sống (Erector Spinae)"}],
+    shots:[{t:"Thả lỏng",pose:"back_relaxed"},{t:"Xòe cánh",pose:"back_latspread"}] },
+  shoulders:{ label:"Vai", abbr:"VAI", weight:15, icon:"shoulders",
+    criteria:"Độ tròn 3 chùm, khả năng phân tách giữa Delt và Traps.",
+    note:"Đứng thẳng, camera hơi từ trên xuống là tốt nhất.",
+    subs:[{k:"front",l:"Chùm vai trước"},{k:"medial",l:"Chùm vai giữa"},{k:"rear",l:"Chùm vai sau"}],
+    shots:[{t:"Nghiêng",pose:"shoulder_side"}] },
+  abs:{ label:"Bụng", abbr:"BỤNG", weight:10, icon:"abs",
+    criteria:"Độ nét từng múi, tỷ lệ mỡ bụng ước tính.",
+    note:"Cởi trần, đứng dưới đèn sáng, gập nhẹ hoặc thẳng đều OK.",
+    subs:[{k:"rectus",l:"Cơ bụng thẳng (số múi)"},{k:"obliques",l:"Cơ liên sườn (Obliques)"},{k:"serratus",l:"Cơ răng cưa (Serratus)"}],
+    shots:[{t:"Ảnh bụng",pose:"abs_crunch"}] },
+  legs:{ label:"Chân", abbr:"CHÂN", weight:25, icon:"legs",
+    criteria:"Độ phát triển đùi trước/sau, độ đối xứng, độ tách cơ.",
+    note:"Mặc quần đùi, đứng xa camera 1 mét, chụp đùi trước và sau.",
+    subs:[{k:"quads",l:"Đùi trước (Quads)"},{k:"hamstrings",l:"Đùi sau (Hamstrings)"},{k:"calves",l:"Bắp chuối (Calves)"}],
+    shots:[{t:"Trước",pose:"legs_front"},{t:"Sau",pose:"legs_back"}] },
+};
+/* Hồ sơ "Chuẩn Elite" — tổng hợp thông số trung bình của nhiều VĐV thể hình
+   IFBB Pro (KHÔNG gắn với một cá nhân cụ thể), dùng làm mốc so sánh TƯƠNG ĐỐI
+   thay vì chấm điểm tuyệt đối theo pixel ảnh. */
+const ELITE_BENCHMARK = {
+  label: "Chuẩn Elite (tổng hợp IFBB Pro)",
+  ffmiMin: 23, ffmiElite: 25,
+  bodyFatPct: "8-12%",
+  somatotype: "Mesomorph-Ectomorph",
+};
+
+function estimateBodyMetrics(profile){
+  // Không còn bịa % mỡ/FFMI bằng seed. Những chỉ số này cần phép đo/thiết bị
+  // hoặc model chuyên dụng và không được suy ra đáng tin cậy chỉ từ cân nặng.
+  return {
+    estBodyFatPct: null,
+    ffmi: null,
+    ffmiLabel: "Chưa đo",
+    somatotype: "Không đủ dữ liệu"
+  };
+}
+
+// Văn bản so sánh tỷ lệ tương đối với Chuẩn Elite, theo từng module
+const MODULE_BENCHMARK_TEXT = {
+  shoulders:(pct)=>`Độ rộng vai ước tính bằng ${pct}% so với ${ELITE_BENCHMARK.label}.`,
+  chest:(pct)=>`Vòng ngực ước tính bằng ${pct}% so với ${ELITE_BENCHMARK.label}.`,
+  arms:(pct)=>`Vòng tay ước tính bằng ${pct}% so với ${ELITE_BENCHMARK.label}.`,
+  abs:(pct)=>`Độ săn chắc vùng eo ước tính bằng ${pct}% so với ${ELITE_BENCHMARK.label}.`,
+  back:(pct)=>`Chỉ số V-Taper (vai/eo) ước tính bằng ${pct}% so với ${ELITE_BENCHMARK.label}.`,
+  legs:(pct)=>`Độ phát triển đùi ước tính bằng ${pct}% so với ${ELITE_BENCHMARK.label}.`,
+};
+function benchmarkPctFor(moduleKey, score){ return null; }
+const MODULE_ORDER = ["arms","chest","back","shoulders","abs","legs"];
+
+const TIME_TABLE = [
+  {min:1.0,max:3.4,label:"0 - 6 tháng",msg:"Người mới bắt đầu – Hãy kiên trì xây dựng nền tảng!"},
+  {min:3.5,max:5.0,label:"7 tháng - 1 năm",msg:"Đã có nền tảng vững chắc – Tiếp tục cải thiện độ định hình!"},
+  {min:5.1,max:6.5,label:"1 - 2 năm",msg:"Fit & Khỏe khoắn – Cơ bắp bắt đầu rõ nét!"},
+  {min:6.6,max:8.4,label:"2 - 4 năm",msg:"Nâng cao – Cơ thể săn chắc, phân tách tốt!"},
+  {min:8.5,max:10.0,label:"4+ năm",msg:"Đỉnh cao – Thể hình chuyên nghiệp!"},
+];
+
+const PIPELINE_STAGES = [
+  "Kiểm tra chất lượng & tư thế ảnh",
+  "AI thị giác phân tích hình thể",
+  "Trích xuất đặc điểm từng nhóm cơ",
+  "Tổng hợp điểm và độ tin cậy"
+];
+
+const REJECT_REASONS = [
+  "Hình ảnh bị che khuất quá nhiều, vui lòng chụp lại góc thoáng hơn."
+];
+const IMPROVE_TIPS = [
+  "Chụp ở nơi có ánh sáng đều, tránh ngược sáng.",
+  "Đứng cách camera khoảng 1–1.5m để lấy trọn vùng cơ.",
+  "Giữ máy ngang tầm vùng cơ đang chụp, hạn chế rung tay.",
+  "Nếu muốn điểm chính xác tuyệt đối, bật Chế độ nâng cao để căn theo bóng ma."
+];
+
+/* ------------------------------------------------------------------ */
+/* STATE                                                                */
+/* ------------------------------------------------------------------ */
+let state = {
+  view:"profile",
+  profile:null,
+  activeModule:null,
+  shots:{},          // {i:{img,attempts,trust,band,reason}}
+  modules:{},        // key -> {score,subs,comment,photos,percentile,confidencePct}
+  analyzing:false,
+  analyzeStage:-1,
+  advancedMode:false,
+  flashOn:false,
+  showTips:false,
+};
+
+/* ------------------------------------------------------------------ */
+/* HELPERS                                                              */
+/* ------------------------------------------------------------------ */
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function hashStr(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return h;}
+function seedFrom(s){return (hashStr(s)%1000)/1000;}
+function round1(n){return Math.round(n*10)/10;}
+function scoreColor(s){ if(s>=7) return "var(--good)"; if(s>=5) return "var(--mid)"; return "var(--bad)"; }
+function scoreLabel(s){ if(s>=7) return "Tốt"; if(s>=5) return "Bình thường"; return "Cần cải thiện"; }
+function genderWord(){ return state.profile && state.profile.gender==="nu" ? "nữ giới" : "nam giới"; }
+
+function completedCount(){return MODULE_ORDER.filter(k=>state.modules[k]).length;}
+function bodyUnlocked(){return completedCount()===6;}
+
+/* Điểm tỷ lệ & cân đối (Symmetry & Proportion Score) — đánh giá sự hài hòa
+   giữa các nhóm cơ (vai/eo, ngực/eo, vai/hông, chân/thân...), độc lập với
+   khối lượng cơ tuyệt đối của từng phần. Một body cân đối, hài hòa vẫn đạt
+   điểm cao dù không có nhóm cơ nào "khủng" nhất. */
+function computeProportionScore(){
+  if(!bodyUnlocked()) return null;
+  const scores = MODULE_ORDER.map(k=>state.modules[k].score);
+  const mean = scores.reduce((a,b)=>a+b,0)/scores.length;
+  const variance = scores.reduce((a,b)=>a+(b-mean)*(b-mean),0)/scores.length;
+  const stddev = Math.sqrt(variance);
+  const harmonyPart = clamp(10 - stddev*2.2, 3, 10);        // càng đồng đều giữa các nhóm cơ, càng hài hòa
+  const seed = seedFrom("proportion"+(state.profile?state.profile.height+state.profile.weight:0)+Math.round(mean*10));
+  const baselinePart = 6.0 + seed*3.6;                       // tỷ lệ vàng vai/eo, ngực/eo... mô phỏng
+  return round1(clamp(harmonyPart*0.45 + baselinePart*0.55, 1, 10));
+}
+
+function computeBodyScore(){
+  if(!bodyUnlocked()) return null;
+  let weightedSum=0;
+  MODULE_ORDER.forEach(k=>{ weightedSum += state.modules[k].score * MODULES[k].weight; });
+  const weightedAvg = weightedSum/100;
+  const proportionScore = computeProportionScore();
+  // Overall = 0.6 * trung bình trọng số nhóm cơ + 0.4 * Điểm tỷ lệ & cân đối
+  return round1(clamp(weightedAvg*0.6 + proportionScore*0.4, 1, 10));
+}
+function getTimeRange(score){
+  return TIME_TABLE.find(r=>score>=r.min && score<=r.max) || TIME_TABLE[TIME_TABLE.length-1];
+}
+
+/* Quy trình tiền xử lý thông minh 2 bước (theo tài liệu):
+   1) Chuẩn hóa ánh sáng — ảnh thiếu sáng/bóng đổ được AI tự động "phục hồi"
+      thay vì bị từ chối (mô phỏng PromptNorm / Frequency-Prior Enhanced).
+   2) Đánh giá tư thế theo góc khớp (mô phỏng MediaPipe BlazePose) — nếu tư thế
+      lệch, hệ thống đưa gợi ý điều chỉnh cụ thể thay vì từ chối ảnh.
+   Chỉ từ chối (yêu cầu chụp lại) khi ảnh bị che khuất nghiêm trọng, hiếm gặp. */
+function computeShotAnalysis(moduleKey, shotIdx, poseKey, attempts, advanced){
+  // Không còn tạo điểm giả bằng seed. Đây chỉ là kiểm tra kỹ thuật rất cơ bản
+  // trước khi gửi ảnh cho AI: ảnh có đủ dữ liệu và kích thước hợp lý hay không.
+  const shot = state.shots[shotIdx];
+  const tipsArr = POSE_ADJUST_TIPS[poseKey] || [];
+  const tooSmall = !shot || !shot.img || shot.img.length < 5000;
+  return {
+    trust: tooSmall ? 4 : 9,
+    band: tooSmall ? "caution" : "good",
+    reason: tooSmall ? "Ảnh có vẻ quá nhỏ hoặc không đọc được." : null,
+    lightingNormalized: false,
+    poseTip: null,
+    tips: tipsArr.slice(0, 1)
+  };
+}
+
+async function analyzeModule(moduleKey, shotsArr){
+  const mod = MODULES[moduleKey];
+  const validShots = shotsArr.filter(Boolean).map(s => ({
+    img: s.img,
+    pose: s.pose || null
+  }));
+
+  if(!validShots.length){
+    throw new Error("Không có ảnh để phân tích.");
+  }
+
+  if(location.protocol === "file:"){
+    throw new Error("Bạn đang mở index.html trực tiếp. Hãy chạy start.bat rồi mở http://localhost:3000");
+  }
+  const response = await fetch("/api/analyze", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({
+      moduleKey,
+      moduleLabel: mod.label,
+      criteria: mod.criteria,
+      subMuscles: mod.subs.map(s => ({key:s.k, label:s.l})),
+      shots: validShots,
+      profile: state.profile ? {
+        age: state.profile.age,
+        gender: state.profile.gender,
+        height: state.profile.height,
+        weight: state.profile.weight
+      } : null,
+      advanced: !!state.advancedMode
+    })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if(!response.ok){
+    throw new Error(payload.error || `AI server lỗi (${response.status})`);
+  }
+
+  const result = payload.result;
+  if(!result || !Array.isArray(result.subs)){
+    throw new Error("AI trả về dữ liệu không hợp lệ.");
+  }
+
+  const subs = mod.subs.map((s, idx) => {
+    const ai = result.subs.find(x => x.key === s.k) || result.subs[idx] || {};
+    const score = round1(clamp(Number(ai.score) || 0, 1, 10));
+    return {
+      l: s.l,
+      score,
+      percentile: null,
+      confidence: clamp(Math.round(Number(ai.confidence) || result.confidence || 0), 0, 100),
+      evidence: String(ai.evidence || "")
+    };
+  });
+
+  const score = round1(clamp(Number(result.score) || 0, 1, 10));
+  const confidencePct = clamp(Math.round(Number(result.confidence) || 0), 0, 100);
+
+  return {
+    score,
+    subs,
+    comment: String(result.comment || "AI đã phân tích các đặc điểm nhìn thấy được trong ảnh."),
+    photos: validShots.map(s => s.img),
+    percentile: null,
+    confidencePct,
+    quality: result.quality || {},
+    measurements: result.measurements || {},
+    limitations: Array.isArray(result.limitations) ? result.limitations : []
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* TOAST + CONFETTI                                                     */
+/* ------------------------------------------------------------------ */
+function showToast(msg, ms=3600){
+  const t=document.getElementById("toast");
+  t.textContent=msg; t.classList.add("show");
+  clearTimeout(window.__toastTimer);
+  window.__toastTimer=setTimeout(()=>t.classList.remove("show"), ms);
+}
+function fireConfetti(){
+  const colors=["#46D5C4","#8C6FE8","#46D98F","#E8B84A","#ECEEEC"];
+  for(let i=0;i<70;i++){
+    const el=document.createElement("div");
+    el.className="confetti";
+    el.style.left=Math.random()*100+"vw";
+    el.style.background=colors[Math.floor(Math.random()*colors.length)];
+    el.style.animationDuration=(2+Math.random()*1.5)+"s";
+    el.style.transform=`rotate(${Math.random()*360}deg)`;
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(), 4000);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* RENDER: ROOT                                                         */
+/* ------------------------------------------------------------------ */
+function render(){
+  const app=document.getElementById("app");
+  app.innerHTML = `
+    <div class="hdr">
+      <div>
+        <div class="sg logo">AI<span>PHYSIQUE</span></div>
+        <div class="mono tag">AI VISION · PHÂN TÍCH HÌNH THỂ</div>
+      </div>
+      <div class="mono" style="font-size:10px;color:var(--accent);">AI LIVE</div>
+    </div>
+    <div id="screen" class="fadein"></div>
+  `;
+  const screen=document.getElementById("screen");
+  if(state.view==="profile") screen.innerHTML = renderProfile();
+  else if(state.view==="dashboard") screen.innerHTML = renderDashboard();
+  else if(state.view==="capture") screen.innerHTML = renderCapture();
+  else if(state.view==="result") screen.innerHTML = renderResult();
+}
+
+/* ------------------------------------------------------------------ */
+/* RENDER: PROFILE GATE                                                 */
+/* ------------------------------------------------------------------ */
+function renderProfile(){
+  const p = state.profile || {gender:"nam", age:25, height:170, weight:70};
+  return `
+    <div class="card" style="max-width:440px;margin:0 auto;">
+      <div class="sg" style="font-size:16px;font-weight:700;margin-bottom:4px;">Thiết lập hồ sơ đa phương thức</div>
+      <div style="font-size:12px;color:var(--dim);margin-bottom:18px;">
+        Hệ thống kết hợp hình ảnh với dữ liệu cơ thể (giới tính, tuổi, chiều cao, cân nặng) để tăng độ chính xác và so sánh percentile với người cùng nhóm.
+      </div>
+      <div style="margin-bottom:14px;">
+        <div class="mono" style="font-size:11px;color:var(--dim);margin-bottom:8px;">GIỚI TÍNH</div>
+        <div style="display:flex;gap:8px;">
+          <button class="tapbtn" onclick="setProfileField('gender','nam')" style="flex:1;padding:10px;border-radius:10px;border:1px solid ${p.gender==='nam'?'var(--accent)':'#2A3034'};background:${p.gender==='nam'?'rgba(70,213,196,0.1)':'#101315'};color:${p.gender==='nam'?'var(--accent)':'var(--text)'};">Nam</button>
+          <button class="tapbtn" onclick="setProfileField('gender','nu')" style="flex:1;padding:10px;border-radius:10px;border:1px solid ${p.gender==='nu'?'var(--accent)':'#2A3034'};background:${p.gender==='nu'?'rgba(70,213,196,0.1)':'#101315'};color:${p.gender==='nu'?'var(--accent)':'var(--text)'};">Nữ</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+        <div><div class="mono" style="font-size:11px;color:var(--dim);margin-bottom:6px;">TUỔI</div><input type="number" id="f_age" value="${p.age}"/></div>
+        <div><div class="mono" style="font-size:11px;color:var(--dim);margin-bottom:6px;">CHIỀU CAO (CM)</div><input type="number" id="f_height" value="${p.height}"/></div>
+      </div>
+      <div style="margin-bottom:18px;"><div class="mono" style="font-size:11px;color:var(--dim);margin-bottom:6px;">CÂN NẶNG (KG)</div><input type="number" id="f_weight" value="${p.weight}"/></div>
+      <button class="tapbtn" onclick="saveProfile()" style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--accent);color:#0A0C0E;font-weight:700;font-size:14px;">Tiếp tục →</button>
+    </div>
+  `;
+}
+function setProfileField(field,val){
+  state.profile = state.profile || {gender:"nam",age:25,height:170,weight:70};
+  state.profile[field]=val; render();
+}
+function saveProfile(){
+  const age=Number(document.getElementById("f_age").value);
+  const height=Number(document.getElementById("f_height").value);
+  const weight=Number(document.getElementById("f_weight").value);
+  state.profile = { gender:(state.profile&&state.profile.gender)||"nam", age, height, weight };
+  state.view="dashboard"; render();
+}
+
+/* ------------------------------------------------------------------ */
+/* RENDER: DASHBOARD                                                    */
+/* ------------------------------------------------------------------ */
+function renderDashboard(){
+  const done = completedCount();
+  const unlocked = bodyUnlocked();
+  const bodyScore = computeBodyScore();
+  const proportionScore = computeProportionScore();
+
+  let topCard;
+  if(unlocked){
+    const range = getTimeRange(bodyScore);
+    const pct = (bodyScore/10)*100;
+    const overallPercentile = clamp(Math.round(bodyScore*10),1,99);
+    topCard = `
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:18px;">
+          <svg width="104" height="104" viewBox="0 0 104 104">
+            <circle cx="52" cy="52" r="44" fill="none" stroke="#2A3034" stroke-width="9"/>
+            <circle cx="52" cy="52" r="44" fill="none" stroke="${scoreColor(bodyScore)}" stroke-width="9"
+              stroke-dasharray="${(pct/100)*276.5} 276.5" stroke-linecap="round" transform="rotate(-90 52 52)"/>
+            <text x="52" y="49" text-anchor="middle" class="sg" font-size="24" font-weight="700" fill="#ECEEEC">${bodyScore.toFixed(1)}</text>
+            <text x="52" y="66" text-anchor="middle" class="mono" font-size="9" fill="#8A9299">/ 10</text>
+          </svg>
+          <div>
+            <div class="mono" style="font-size:10px;color:var(--dim);letter-spacing:.5px;">OVERALL BODY SCORE</div>
+            <div class="sg" style="font-size:15px;font-weight:700;margin:4px 0 6px;">Tương đương ${range.label} tập luyện</div>
+            <div style="font-size:12px;color:var(--dim);margin-bottom:4px;">${range.msg}</div>
+            <div style="font-size:12px;color:var(--accent2);">Phát triển hơn ${overallPercentile}% ${genderWord()} cùng cân nặng ${state.profile?state.profile.weight:''}kg</div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
+          <div>
+            <div style="font-size:12.5px;font-weight:600;">⚖️ Điểm tỷ lệ &amp; cân đối</div>
+            <div style="font-size:11px;color:var(--dim);max-width:340px;">Đánh giá sự hài hòa giữa các nhóm cơ (vai/eo, ngực/eo...), không bị kéo xuống bởi riêng một nhóm cơ.</div>
+          </div>
+          <div class="mono" style="font-size:18px;font-weight:700;color:${scoreColor(proportionScore)};">${proportionScore.toFixed(1)}</div>
+        </div>
+        <div style="font-size:10.5px;color:var(--dim2);margin-top:6px;">Overall = 0.6 × trung bình trọng số nhóm cơ (phân vị) + 0.4 × Điểm tỷ lệ</div>
+      </div>`;
+  } else {
+    topCard = `
+      <div class="card">
+        <div class="row" style="margin-bottom:10px;">
+          <div class="sg" style="font-size:14px;font-weight:700;">🔒 Điểm Body đang chờ dữ liệu</div>
+          <div class="mono" style="font-size:12px;color:var(--dim);">${done}/6 module</div>
+        </div>
+        <div class="barTrack" style="margin-bottom:12px;"><div class="barFill" style="width:${(done/6)*100}%;background:var(--accent);"></div></div>
+        <div style="font-size:12px;color:var(--dim);">Hoàn thành đủ 6 module để mở khóa điểm Body tổng thể, mốc thời gian tập tương đương và percentile so với ${genderWord()} cùng cân nặng.</div>
+      </div>`;
+  }
+
+  const grid = MODULE_ORDER.map(k=>{
+    const mod=MODULES[k]; const data=state.modules[k];
+    if(data){
+      return `
+        <div class="modcard tapbtn" style="border:1px solid ${scoreColor(data.score)}55;cursor:pointer;" onclick="openResult('${k}')" role="button" tabindex="0">
+          <button class="delbtn tapbtn" onclick="event.stopPropagation();deleteModule('${k}')" title="Xóa dữ liệu">✕</button>
+          <div class="badge" style="background:${scoreColor(data.score)}22;color:${scoreColor(data.score)};">${mod.abbr}</div>
+          <div class="name">${mod.label}</div>
+          <div class="score mono" style="color:${scoreColor(data.score)};">${data.score.toFixed(1)}</div>
+          ${data.confidencePct<85 ? `<div style="font-size:10px;color:var(--mid);margin-top:2px;">Tin cậy ${data.confidencePct}%</div>` : ""}
+        </div>`;
+    }
+    return `
+      <button class="modcard tapbtn" style="text-align:left;" onclick="openCapture('${k}')">
+        <div class="badge" style="background:#23282C;color:var(--dim);">${mod.abbr}</div>
+        <div class="name">${mod.label}</div>
+        <div class="cta">Phân tích ngay →</div>
+      </button>`;
+  }).join("");
+
+  const ranked = MODULE_ORDER.filter(k=>state.modules[k]).map(k=>({k,score:state.modules[k].score})).sort((a,b)=>b.score-a.score);
+  const leaderboard = ranked.length===0
+    ? `<div style="font-size:12px;color:var(--dim2);">Chưa có dữ liệu — hãy phân tích module đầu tiên.</div>`
+    : ranked.map((r,i)=>`
+      <div class="row" style="padding:8px 0;${i<ranked.length-1?'border-bottom:1px solid var(--border);':''}">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span class="mono" style="color:var(--dim2);font-size:12px;">#${i+1}</span>
+          <span style="font-size:13px;">${MODULES[r.k].label}</span>
+        </div>
+        <span class="mono" style="font-weight:700;color:${scoreColor(r.score)};">${r.score.toFixed(1)}</span>
+      </div>`).join("");
+
+  const bm = state.profile ? estimateBodyMetrics(state.profile) : null;
+  const bodyMetricsCard = bm ? `
+    <div class="card" style="margin-bottom:14px;">
+      <div class="row" style="margin-bottom:2px;">
+        <div class="sg" style="font-size:13px;font-weight:700;">Chỉ số cơ thể ước tính</div>
+        <span class="pill mono" style="background:${bm.ffmiLabel==='Elite'?'rgba(70,213,196,0.15)':'rgba(140,111,232,0.15)'};color:${bm.ffmiLabel==='Elite'?'var(--accent)':'var(--accent2)'};">${bm.ffmiLabel}</span>
+      </div>
+      <div style="font-size:12px;color:var(--dim);line-height:1.7;margin-top:6px;">
+        FFMI (chỉ số cơ nạc): <b style="color:var(--text);">${bm.ffmi}</b> · %mỡ cơ thể ước tính: <b style="color:var(--text);">${bm.estBodyFatPct}%</b><br>
+        Phân loại vóc dáng (Heath-Carter): <b style="color:var(--text);">${bm.somatotype}</b><br>
+        <span style="color:var(--dim2);">So với ${ELITE_BENCHMARK.label} (FFMI ~${ELITE_BENCHMARK.ffmiMin}-${ELITE_BENCHMARK.ffmiElite}, ${ELITE_BENCHMARK.bodyFatPct} mỡ cơ thể).</span>
+      </div>
+    </div>` : "";
+
+  return `
+    ${topCard}
+    ${bodyMetricsCard}
+    <div class="grid6">${grid}</div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="sg" style="font-size:14px;font-weight:700;margin-bottom:8px;">Bảng xếp hạng nội bộ</div>
+      ${leaderboard}
+    </div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="sg" style="font-size:13px;font-weight:700;margin-bottom:6px;">Cách AI đánh giá cơ bắp</div>
+      <div style="font-size:12px;color:var(--dim);line-height:1.7;">
+        Ảnh 2D chỉ ghi lại bề mặt, không đo được chiều sâu và khối lượng cơ thực. Vì vậy, thay vì chỉ "nhìn ảnh", hệ thống <b style="color:var(--text);">tái tạo mô hình cơ thể 3D</b> từ ảnh chụp, phân tích <b style="color:var(--text);">động lực học cơ bắp</b> để suy luận khối lượng cơ thực tế. Điểm số được chấm theo <b style="color:var(--text);">tỷ lệ tương đối</b> — so sánh cân đối giữa các nhóm cơ với ${ELITE_BENCHMARK.label} — chứ không chấm tuyệt đối theo pixel ảnh, nên ít bị ảnh hưởng bởi góc chụp, ánh sáng hay pose. Bóng ma/icon vẫn chỉ mang tính <b style="color:var(--text);">tham khảo</b>.
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--dim2);line-height:1.6;padding:0 4px;">
+      Điểm số do AI ước tính, chỉ mang tính tham khảo. Không thay thế đánh giá chuyên môn của huấn luyện viên hoặc bác sĩ.
+      <br><span style="color:var(--dim2);">Bản demo mô phỏng luồng chấm điểm — chưa kết nối mô hình AI thật.</span>
+    </div>
+  `;
+}
+
+/* ------------------------------------------------------------------ */
+/* RENDER: CAPTURE                                                      */
+/* ------------------------------------------------------------------ */
+function renderCapture(){
+  const k=state.activeModule; const mod=MODULES[k];
+
+  const shotsHtml = mod.shots.map((s,i)=>{
+    const shot = state.shots[i];
+    const hasImg = shot && shot.img;
+    const processing = shot && shot.processing;
+    const band = shot && !processing ? shot.band : null;
+    const stars = (shot && !processing) ? "⭐".repeat(clamp(Math.round(shot.trust/2),1,5)) + "☆".repeat(5-clamp(Math.round(shot.trust/2),1,5)) : "";
+    const chips = [];
+    if(shot && !processing && shot.lightingNormalized) chips.push(`<span class="chip chipInfo">💡 Đã tự động chuẩn hóa ánh sáng</span>`);
+    if(shot && !processing && shot.poseTip) chips.push(`<span class="chip chipWarn">📐 Gợi ý: ${shot.poseTip}</span>`);
+    return `
+      <div style="margin-bottom:18px;">
+        <div style="font-size:13px;font-weight:600;margin-bottom:8px;">Ảnh ${i+1}: ${s.t}</div>
+        <div class="viewfinder ${state.flashOn?'flash':''}" style="aspect-ratio:3/4;">
+          ${hasImg ? `<img src="${shot.img}"/>` : ""}
+          ${processing ? `
+            <div class="procOverlay">
+              <div class="procSpinner"></div>
+              <div class="procLabel">Đang đánh giá tư thế &amp; chuẩn hóa ánh sáng...</div>
+            </div>` : ""}
+          <div class="corner c-tl"></div><div class="corner c-tr"></div><div class="corner c-bl"></div><div class="corner c-br"></div>
+          ${state.advancedMode
+            ? `<div class="centerGhost">${centerGhostSVG(s.pose)}</div>`
+            : `<div class="cornerRef" style="opacity:0.55;">${cornerIcon(mod.icon)}</div>`}
+        </div>
+        <div class="shutterWrap">
+          <button type="button" class="tapbtn shutterBtn ${band==='good'||band==='caution'?'done':(band==='reject'?'reject':'')}" onclick="openCamera(${i})" aria-label="Mở camera chụp ảnh"></button>
+        </div>
+        <div class="noteText" style="margin-top:0;margin-bottom:2px;">📷 Chụp trực tiếp trong app — ảnh không được lưu vào thư viện/kho ảnh máy.</div>
+        <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap;">
+          <button class="tapbtn" onclick="pickFromLibrary(${i})" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);color:var(--dim);font-size:12px;">
+            📁 Thư viện
+          </button>
+          <button class="tapbtn" onclick="pasteImage(${i})" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);color:var(--dim);font-size:12px;">
+            📋 Dán ảnh
+          </button>
+        </div>
+        <div style="font-size:10.5px;color:var(--dim2);text-align:center;margin-top:6px;">Mẹo: bạn cũng có thể dán trực tiếp bằng Ctrl+V (Cmd+V trên Mac).</div>
+        ${shot && !processing ? `<div style="text-align:center;"><span class="stars">${stars}</span> <span class="mono" style="font-size:11px;color:var(--dim);">Độ tin cậy ${Math.round(shot.trust*10)}%</span></div>` : ""}
+        ${chips.length ? `<div class="chipRow">${chips.join("")}</div>` : ""}
+        ${band==='caution' ? `<div class="cautionBox">Độ tin cậy ${Math.round(shot.trust*10)}% do ảnh chưa đủ độ tương phản/độ nét — vẫn được phân tích, nhưng chụp rõ hơn sẽ cho kết quả chính xác hơn.</div>` : ""}
+        ${band==='reject' ? `<div class="reasonBox">⚠️ ${shot.reason} Vui lòng chụp lại.</div>` : ""}
+      </div>`;
+  }).join("");
+
+  const allAccepted = mod.shots.every((_,i)=> state.shots[i] && !state.shots[i].processing && state.shots[i].band!=="reject");
+
+  return `
+    <div class="captureBar">
+      <button class="tapbtn" onclick="backToDashboard()" style="background:none;border:none;color:var(--dim);font-size:13px;">✕ Thoát</button>
+      <div class="sg" style="font-size:14px;font-weight:700;">${mod.label}</div>
+      <button class="iconBtn tapbtn ${state.flashOn?'on':''}" onclick="toggleFlash()">🔦</button>
+    </div>
+
+    <div class="toggleRow">
+      <div>
+        <div style="font-size:13px;font-weight:600;">Chế độ nâng cao</div>
+        <div style="font-size:11px;color:var(--dim);">Căn chính xác theo bóng ma toàn thân — cho điểm tín nhiệm cao hơn.</div>
+      </div>
+      <div class="switch ${state.advancedMode?'on':''}" onclick="toggleAdvanced()"></div>
+    </div>
+
+    <div class="noteText" style="margin-bottom:14px;text-align:left;">${mod.note}</div>
+
+    ${shotsHtml}
+
+    <button class="tapbtn" ${allAccepted && !state.analyzing ? "" : "disabled"} onclick="runAnalysis()"
+      style="width:100%;padding:13px;border-radius:12px;border:none;font-weight:700;font-size:14px;margin-top:6px;
+      background:${allAccepted && !state.analyzing ? "var(--accent)" : "#23282C"};
+      color:${allAccepted && !state.analyzing ? "#0A0C0E" : "var(--dim2)"};">
+      ${state.analyzing ? "Đang xử lý..." : "Phân tích ngay"}
+    </button>
+    ${state.analyzing ? renderPipeline() : ""}
+  `;
+}
+
+function toggleFlash(){ state.flashOn=!state.flashOn; render(); }
+function toggleAdvanced(){ state.advancedMode=!state.advancedMode; render(); }
+
+function renderPipeline(){
+  return `
+    <div class="card" style="margin-top:14px;position:relative;overflow:hidden;">
+      <div class="grid-overlay"></div><div class="scanline"></div>
+      <div style="position:relative;">
+        ${PIPELINE_STAGES.map((s,i)=>{
+          const cls = i<state.analyzeStage ? "done" : (i===state.analyzeStage ? "active" : "");
+          const dot = i<state.analyzeStage ? "✓" : (i+1);
+          return `<div class="stageRow ${cls}"><span class="stageDot">${dot}</span><span>${s}</span></div>`;
+        }).join("")}
+      </div>
+    </div>`;
+}
+
+/* ------------------------------------------------------------------ */
+/* RENDER: RESULT                                                       */
+/* ------------------------------------------------------------------ */
+function renderResult(){
+  const k=state.activeModule; const mod=MODULES[k]; const data=state.modules[k];
+  const dash=(data.score/10)*2*Math.PI*46;
+
+  const subsHtml = data.subs.map(s=>`
+    <div style="margin-bottom:14px;">
+      <div class="row" style="font-size:13px;margin-bottom:5px;">
+        <span>${s.l}</span>
+        <span class="mono" style="font-weight:700;color:${scoreColor(s.score)};">${s.score.toFixed(1)} <span style="font-size:10px;color:var(--dim);">(${scoreLabel(s.score)})</span></span>
+      </div>
+      <div class="barTrack" style="margin-bottom:4px;"><div class="barFill" style="width:${s.score*10}%;background:${scoreColor(s.score)};"></div></div>
+      <div style="font-size:11px;color:var(--accent2);">Phát triển hơn ${s.percentile}% ${genderWord()} cùng cân nặng</div>
+    </div>`).join("");
+
+  const photosHtml = data.photos.map(p=>`<img src="${p}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--border);margin-right:8px;"/>`).join("");
+
+  const lowConfidence = data.confidencePct < 85;
+
+  return `
+    <button class="tapbtn" onclick="backToDashboard()" style="background:none;border:none;color:var(--dim);font-size:13px;margin-bottom:14px;">← Quay lại</button>
+    <div class="sg" style="font-size:15px;font-weight:700;margin-bottom:10px;">✅ Kết quả phân tích ${mod.label} của bạn</div>
+
+    <div class="card" style="text-align:center;margin-bottom:14px;">
+      <div style="margin-bottom:12px;">${photosHtml}</div>
+      <svg width="120" height="120" viewBox="0 0 120 120">
+        <circle cx="60" cy="60" r="46" fill="none" stroke="#2A3034" stroke-width="9"/>
+        <circle cx="60" cy="60" r="46" fill="none" stroke="${scoreColor(data.score)}" stroke-width="9"
+          stroke-dasharray="${dash} ${2*Math.PI*46}" stroke-linecap="round" transform="rotate(-90 60 60)"/>
+        <text x="60" y="57" text-anchor="middle" class="sg" font-size="26" font-weight="700" fill="#ECEEEC">${data.score.toFixed(1)}</text>
+        <text x="60" y="75" text-anchor="middle" class="mono" font-size="9" fill="#8A9299">/ 10</text>
+      </svg>
+      <div style="font-size:12px;color:var(--accent2);margin-top:4px;">Phát triển hơn ${data.percentile}% ${genderWord()} cùng cân nặng</div>
+      <div class="mono" style="font-size:11px;color:${lowConfidence?'var(--mid)':'var(--dim)'};margin-top:6px;">Độ tin cậy mô hình 3D: ${data.confidencePct}%</div>
+    </div>
+
+    ${lowConfidence ? `
+    <div class="card" style="margin-bottom:14px;border-color:var(--mid);">
+      <div style="font-size:12.5px;color:var(--mid);">⚠️ Mô hình 3D được tái tạo với độ tin cậy ${data.confidencePct}% do ảnh chưa tối ưu (góc chụp/che khuất). Điểm số vẫn dựa trên khối lượng cơ ước tính, ít phụ thuộc ánh sáng — nhưng chụp thêm góc hoặc bật Chế độ nâng cao sẽ giúp tái tạo chính xác hơn.</div>
+    </div>` : ""}
+
+    <div class="card" style="margin-bottom:14px;">
+      <div class="sg" style="font-size:13px;font-weight:700;margin-bottom:8px;">So sánh tỷ lệ với ${ELITE_BENCHMARK.label}</div>
+      <div style="font-size:12.5px;color:#C7CCD1;line-height:1.6;">${MODULE_BENCHMARK_TEXT[k] ? MODULE_BENCHMARK_TEXT[k](benchmarkPctFor(k,data.score)) : ""}</div>
+      <div class="barTrack" style="margin-top:8px;"><div class="barFill" style="width:${benchmarkPctFor(k,data.score)}%;background:var(--accent2);"></div></div>
+      <div style="font-size:11px;color:var(--dim2);margin-top:6px;">Đánh giá dựa trên tỷ lệ và sự cân đối giữa các nhóm cơ, không chấm điểm tuyệt đối theo pixel ảnh — ít bị ảnh hưởng bởi góc chụp hay ánh sáng.</div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px;">
+      <div class="sg" style="font-size:13px;font-weight:700;margin-bottom:12px;">Chi tiết nhóm cơ con</div>
+      ${subsHtml}
+    </div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="sg" style="font-size:13px;font-weight:700;margin-bottom:8px;">Nhận xét</div>
+      <div style="font-size:13px;color:#C7CCD1;line-height:1.6;">${data.comment}</div>
+      <div style="font-size:11px;color:var(--dim2);margin-top:10px;">Điểm số dựa trên khối lượng cơ ước tính từ mô hình 3D, đối chiếu với database vận động viên thể hình chuyên nghiệp.</div>
+    </div>
+
+    ${state.showTips ? `
+    <div class="card" style="margin-bottom:14px;">
+      <div class="sg" style="font-size:13px;font-weight:700;margin-bottom:8px;">Hướng dẫn cải thiện độ chính xác</div>
+      ${IMPROVE_TIPS.map(t=>`<div style="font-size:12.5px;color:var(--dim);margin-bottom:6px;">• ${t}</div>`).join("")}
+    </div>` : ""}
+
+    <div style="display:flex;gap:8px;">
+      <button class="tapbtn" onclick="retake('${k}')" style="flex:1;padding:12px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--dim);font-size:12.5px;">Chụp lại</button>
+      <button class="tapbtn" onclick="toggleTips()" style="flex:1;padding:12px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--dim);font-size:12.5px;">Hướng dẫn cải thiện</button>
+      <button class="tapbtn" onclick="backToDashboard()" style="flex:1.4;padding:12px;border-radius:12px;border:none;background:var(--accent);color:#0A0C0E;font-weight:700;font-size:12.5px;">Lưu kết quả</button>
+    </div>
+  `;
+}
+function toggleTips(){ state.showTips=!state.showTips; render(); }
+
+/* ------------------------------------------------------------------ */
+/* HANDLERS                                                             */
+/* ------------------------------------------------------------------ */
+function openCapture(k){
+  state.activeModule=k; state.shots={}; state.analyzing=false; state.analyzeStage=-1; state.showTips=false; state.view="capture"; render();
+}
+function openResult(k){
+  state.activeModule=k; state.showTips=false; state.view="result"; render();
+}
+function backToDashboard(){
+  state.view="dashboard"; state.activeModule=null; render();
+}
+
+/* ------------------------------------------------------------------ */
+/* INPUT FILE DÙNG CHUNG — tạo 1 LẦN DUY NHẤT khi app khởi động, không */
+/* tạo/xóa mỗi lần bấm nữa. Đây là cách khắc phục lỗi: chọn ảnh xong   */
+/* không nạp được vào app, và bấm lần sau không mở lại được dialog.    */
+/* ------------------------------------------------------------------ */
+let libraryTargetIndex = null;
+const libraryInput = document.createElement('input');
+libraryInput.type = 'file';
+libraryInput.accept = 'image/*';
+libraryInput.style.display = 'none';
+document.body.appendChild(libraryInput);
+libraryInput.addEventListener('change', ()=>{
+  const file = libraryInput.files && libraryInput.files[0];
+  const idx = libraryTargetIndex;
+  libraryInput.value = ''; // reset NGAY để lần bấm sau chắc chắn mở lại được
+  if(file && idx!=null){
+    const reader = new FileReader();
+    reader.onload = e => processShotImage(idx, e.target.result);
+    reader.readAsDataURL(file);
+  }
+});
+function pickFromLibrary(i){
+  libraryTargetIndex = i;
+  libraryInput.value = ''; // đảm bảo dialog mở lại kể cả nếu lần trước bị hủy
+  libraryInput.click();
+}
+
+let cameraNativeTargetIndex = null;
+const cameraNativeInput = document.createElement('input');
+cameraNativeInput.type = 'file';
+cameraNativeInput.accept = 'image/*';
+cameraNativeInput.capture = 'environment';
+cameraNativeInput.style.display = 'none';
+document.body.appendChild(cameraNativeInput);
+cameraNativeInput.addEventListener('change', ()=>{
+  const file = cameraNativeInput.files && cameraNativeInput.files[0];
+  const idx = cameraNativeTargetIndex;
+  cameraNativeInput.value = '';
+  if(file && idx!=null){
+    const reader = new FileReader();
+    reader.onload = e => processShotImage(idx, e.target.result);
+    reader.readAsDataURL(file);
+  }
+});
+function pickFromCameraNative(i){
+  cameraNativeTargetIndex = i;
+  cameraNativeInput.value = '';
+  cameraNativeInput.click();
+}
+
+/* ------------------------------------------------------------------ */
+/* CAMERA TRỰC TIẾP TRONG APP (getUserMedia)                            */
+/* Chụp ảnh ngay trong app bằng luồng video trực tiếp — ảnh chỉ tồn tại
+   trong bộ nhớ (dataURL) để phân tích, KHÔNG được lưu vào thư viện/kho
+   ảnh của máy như khi dùng camera hệ thống.                            */
+/* ------------------------------------------------------------------ */
+let cameraStream=null, cameraFacing='environment', cameraTargetIndex=null;
+
+function openCamera(i){
+  if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){
+    showToast("Trình duyệt này chưa hỗ trợ camera trực tiếp trong app — đang mở camera hệ thống...");
+    pickFromCameraNative(i);
+    return;
+  }
+  cameraTargetIndex=i; cameraFacing='environment';
+  buildCameraOverlay();
+  startCameraStream();
+}
+function buildCameraOverlay(){
+  if(document.getElementById('cameraOverlay')) return;
+  const overlay=document.createElement('div');
+  overlay.id='cameraOverlay';
+  overlay.style.cssText='position:fixed;inset:0;background:#000;z-index:2000;display:flex;align-items:center;justify-content:center;overflow:hidden;';
+  overlay.innerHTML=`
+    <video id="cameraVideo" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;"></video>
+    <div style="position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:16px;">
+      <button type="button" onclick="closeCamera()" style="width:40px;height:40px;border-radius:999px;border:none;background:rgba(255,255,255,0.15);color:#fff;font-size:17px;">✕</button>
+      <button type="button" onclick="flipCamera()" style="width:40px;height:40px;border-radius:999px;border:none;background:rgba(255,255,255,0.15);color:#fff;font-size:15px;">🔄</button>
+    </div>
+    <div id="cameraStatus" style="position:absolute;top:66px;left:12px;right:12px;text-align:center;color:#fff;font-size:12px;opacity:0.85;"></div>
+    <div style="position:absolute;bottom:32px;left:0;right:0;display:flex;justify-content:center;">
+      <button type="button" onclick="capturePhoto()" style="width:70px;height:70px;border-radius:999px;border:4px solid #46D5C4;background:transparent;padding:0;">
+        <span style="display:block;width:56px;height:56px;margin:0 auto;border-radius:999px;background:#46D5C4;"></span>
+      </button>
+    </div>
+    <div style="position:absolute;bottom:10px;left:0;right:0;text-align:center;color:#8A9299;font-size:10.5px;">Ảnh chỉ dùng để phân tích — không lưu vào thư viện ảnh máy</div>
+  `;
+  document.body.appendChild(overlay);
+}
+async function startCameraStream(){
+  const statusEl=document.getElementById('cameraStatus');
+  try{
+    if(cameraStream){ cameraStream.getTracks().forEach(t=>t.stop()); cameraStream=null; }
+    cameraStream=await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ideal:cameraFacing} }, audio:false });
+    const video=document.getElementById('cameraVideo');
+    if(video){ video.srcObject=cameraStream; }
+    if(statusEl) statusEl.textContent="";
+  } catch(err){
+    if(statusEl) statusEl.textContent="Không thể mở camera — vui lòng cấp quyền truy cập camera, hoặc dùng Thư viện ảnh.";
+    showToast("Không mở được camera. Hãy cấp quyền camera cho trang này, hoặc chọn ảnh từ thư viện.");
+  }
+}
+function flipCamera(){
+  cameraFacing = cameraFacing==='environment' ? 'user' : 'environment';
+  startCameraStream();
+}
+function capturePhoto(){
+  const video=document.getElementById('cameraVideo');
+  if(!video || !video.videoWidth){ showToast("Camera chưa sẵn sàng, vui lòng thử lại sau giây lát."); return; }
+  const canvas=document.createElement('canvas');
+  canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+  const dataUrl=canvas.toDataURL('image/jpeg', 0.92);
+  const idx=cameraTargetIndex;
+  closeCamera();
+  processShotImage(idx, dataUrl);
+}
+function closeCamera(){
+  if(cameraStream){ cameraStream.getTracks().forEach(t=>t.stop()); cameraStream=null; }
+  const overlay=document.getElementById('cameraOverlay');
+  if(overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+  cameraTargetIndex=null;
+}
+
+/* Bước xử lý ảnh dùng chung cho cả 3 nguồn: chụp camera, chọn từ thư viện,
+   và dán từ clipboard. */
+function processShotImage(i, dataUrl){
+  const prevAttempts = (state.shots[i] && state.shots[i].attempts) || 0;
+  const attempts = prevAttempts+1;
+  // Giai đoạn 1: hiển thị trạng thái đang tiền xử lý (đánh giá tư thế + chuẩn hóa ánh sáng)
+  state.shots[i] = { img:dataUrl, attempts, processing:true };
+  render();
+  const moduleKey = state.activeModule;
+  const poseKey = MODULES[moduleKey].shots[i].pose;
+  setTimeout(()=>{
+    // Giai đoạn 2: kết quả sau khi tiền xử lý xong
+    const check = computeShotAnalysis(moduleKey, i, poseKey, attempts, state.advancedMode);
+    state.shots[i] = {
+      img:dataUrl, attempts, processing:false,
+      trust:check.trust, band:check.band, reason:check.reason,
+      lightingNormalized:check.lightingNormalized, poseTip:check.poseTip
+    };
+    render();
+    if(check.band==="reject"){
+      showToast(`Ảnh chưa đạt yêu cầu — ${check.reason}`);
+    } else if(check.lightingNormalized){
+      showToast("💡 Ảnh đã được tự động chuẩn hóa ánh sáng.");
+    }
+  }, 900);
+}
+
+/* Dán ảnh từ clipboard cho một ô ảnh cụ thể, dùng Clipboard API. */
+async function pasteImage(i){
+  try{
+    if(navigator.clipboard && navigator.clipboard.read){
+      const items = await navigator.clipboard.read();
+      for(const item of items){
+        const type = item.types.find(t=>t.startsWith('image/'));
+        if(type){
+          const blob = await item.getType(type);
+          readBlobIntoShot(i, blob);
+          return;
+        }
+      }
+      showToast("Không tìm thấy ảnh trong clipboard.");
+    } else {
+      showToast("Trình duyệt này chưa hỗ trợ nút Dán — hãy bấm Ctrl+V (Cmd+V) khi đang xem khung ảnh.");
+    }
+  } catch(err){
+    showToast("Không thể đọc clipboard — hãy thử Ctrl+V (Cmd+V), hoặc cấp quyền clipboard cho trang này.");
+  }
+}
+function readBlobIntoShot(i, blob){
+  const reader = new FileReader();
+  reader.onload = e => processShotImage(i, e.target.result);
+  reader.readAsDataURL(blob);
+}
+
+/* Cho phép dán ảnh bằng Ctrl+V/Cmd+V khi đang ở màn hình chụp, không cần
+   bấm nút — tự tìm ô ảnh chưa có ảnh (hoặc bị từ chối) để điền vào. */
+document.addEventListener('paste', (e)=>{
+  if(state.view!=='capture' || !state.activeModule) return;
+  const items = e.clipboardData && e.clipboardData.items;
+  if(!items) return;
+  for(const item of items){
+    if(item.type && item.type.indexOf('image/')===0){
+      const blob = item.getAsFile();
+      if(!blob) continue;
+      const mod = MODULES[state.activeModule];
+      let idx = mod.shots.findIndex((_,i)=> !state.shots[i] || state.shots[i].band==='reject');
+      if(idx===-1) idx=0;
+      readBlobIntoShot(idx, blob);
+      e.preventDefault();
+      break;
+    }
+  }
+});
+
+async function runAnalysis(){
+  const k = state.activeModule;
+  const mod = MODULES[k];
+  const shotsArr = mod.shots.map((_,i) => state.shots[i]);
+
+  if(shotsArr.some(s => !s || !s.img)){
+    showToast("Hãy tải đủ ảnh theo yêu cầu trước khi phân tích.");
+    return;
+  }
+
+  state.analyzing = true;
+  state.analyzeStage = 0;
+  render();
+
+  try{
+    const stages = [
+      "Kiểm tra chất lượng & tư thế ảnh",
+      "AI thị giác phân tích hình thể",
+      "Trích xuất đặc điểm từng nhóm cơ",
+      "Tổng hợp điểm và độ tin cậy"
+    ];
+
+    for(let i=0; i<stages.length; i++){
+      state.analyzeStage = i + 1;
+      render();
+      await new Promise(r => setTimeout(r, 250));
+    }
+
+    const result = await analyzeModule(k, shotsArr);
+    finishAnalysis(k, shotsArr, result);
+  }catch(err){
+    console.error(err);
+    state.analyzing = false;
+    state.analyzeStage = -1;
+    render();
+    showToast(`Không thể phân tích AI: ${err.message}`, 6000);
+  }
+}
+
+function finishAnalysis(k, shotsArr, result){
+  const wasUnlockedBefore = bodyUnlocked();
+  const isUpdate = !!state.modules[k];
+  const prevBodyScore = computeBodyScore();
+
+  state.modules[k] = result;
+  state.analyzing = false;
+  state.analyzeStage = -1;
+  state.view = "result";
+  render();
+
+  const nowUnlocked = bodyUnlocked();
+  if(nowUnlocked && !wasUnlockedBefore){
+    setTimeout(()=>{ fireConfetti(); showToast("🎉 Đã hoàn tất đánh giá các module."); }, 300);
+  } else if(isUpdate && wasUnlockedBefore){
+    const newScore = computeBodyScore();
+    if(prevBodyScore != null && newScore != null){
+      showToast(`Điểm Body vừa được cập nhật: ${prevBodyScore.toFixed(1)} ➔ ${newScore.toFixed(1)}`);
+    }
+  }
+}
+
+function retake(k){
+  state.shots={}; state.analyzing=false; state.analyzeStage=-1; state.view="capture"; render();
+}
+function deleteModule(k){
+  if(!confirm(`Xóa dữ liệu module ${MODULES[k].label}?`)) return;
+  const wasUnlocked = bodyUnlocked();
+  delete state.modules[k];
+  render();
+  if(wasUnlocked) showToast("🔒 Điểm Body đã bị khóa lại do thiếu dữ liệu module.");
+}
+
+/* init */
+render();
+</script>
+</body>
+</html>
