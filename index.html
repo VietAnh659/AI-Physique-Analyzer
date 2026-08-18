@@ -36,6 +36,11 @@
   @keyframes fadein{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
 
   .hdr{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:22px;border-bottom:1px solid var(--border);padding-bottom:14px;}
+
+  .appFooter{margin-top:28px;padding:16px 10px 4px;text-align:center;border-top:1px solid rgba(70,213,196,.08);color:var(--dim2);font-size:10.5px;letter-spacing:.25px;line-height:1.7;}
+  .appFooter .author{display:inline-block;color:var(--dim);font-weight:600;padding:5px 10px;border-radius:9px;transition:transform .22s cubic-bezier(.2,.75,.25,1),color .22s ease,background .22s ease,box-shadow .22s ease;}
+  .appFooter .author:hover{color:var(--accent);background:rgba(70,213,196,.045);transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,0,0,.18),0 0 18px rgba(70,213,196,.05);}
+  .appFooter .dot{color:var(--accent);opacity:.7;padding:0 4px;}
   .hdr .logo{font-size:20px;font-weight:700;letter-spacing:.5px;}
   .hdr .logo span{color:var(--accent);}
   .hdr .tag{font-size:10px;color:var(--dim);letter-spacing:.5px;}
@@ -603,6 +608,9 @@ function render(){
       <div class="mono" style="font-size:10px;color:var(--dim2);">DEMO</div>
     </div>
     <div id="screen" class="fadein"></div>
+    <footer class="appFooter">
+      <span class="author tapbtn" title="Tác giả">Designed &amp; Developed by Viet Anh <span class="dot">·</span> © 2026</span>
+    </footer>
   `;
   const screen=document.getElementById("screen");
   if(state.view==="profile") screen.innerHTML = renderProfile();
