@@ -19,8 +19,14 @@
   .mono{font-family:'JetBrains Mono',monospace;}
   #app{max-width:760px;margin:0 auto;padding:18px 16px 70px;min-height:100vh;}
   button{font-family:inherit;}
-  .tapbtn{transition:transform .12s ease, border-color .12s ease; cursor:pointer;}
+  .tapbtn{transition:transform .22s cubic-bezier(.2,.75,.25,1), border-color .22s ease, box-shadow .22s ease, filter .22s ease; cursor:pointer;position:relative;}
   .tapbtn:active{transform:scale(0.97);}
+  .tapbtn.ui-hover-active{transform:translateY(-2px) scale(1.008);border-color:rgba(70,213,196,.42)!important;box-shadow:0 8px 24px rgba(0,0,0,.22),0 0 20px rgba(70,213,196,.08);}
+  .tapbtn.ui-hover-active .ui-hover-glow{opacity:1;}
+  .ui-hover-glow{position:absolute;inset:0;pointer-events:none;z-index:0;opacity:0;transition:opacity .18s ease;background:radial-gradient(circle at var(--ui-mx,50%) var(--ui-my,50%),rgba(70,213,196,.18) 0%,rgba(70,213,196,.08) 22%,rgba(70,213,196,.025) 45%,transparent 70%);border-radius:inherit;}
+  .tapbtn.ui-hover-active > :not(.ui-hover-glow){position:relative;z-index:1;}
+  .tapbtn:disabled{cursor:not-allowed;}
+  @media (hover:none){.tapbtn.ui-hover-active{transform:none;box-shadow:none;border-color:inherit!important;}.ui-hover-glow{display:none;}}
   .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:18px;}
   .row{display:flex;align-items:center;justify-content:space-between;}
   .pill{display:inline-block;padding:5px 12px;border-radius:999px;font-size:11px;font-weight:700;}
@@ -203,7 +209,7 @@
   .cameraGuide::before{left:-1px;top:-1px;border-left:2px solid;border-top:2px solid;border-radius:10px 0 0 0}.cameraGuide::after{right:-1px;bottom:-1px;border-right:2px solid;border-bottom:2px solid;border-radius:0 0 10px 0}
   .cameraBottom{position:absolute;bottom:0;left:0;right:0;padding:12px 18px 22px;z-index:3;text-align:center}
   .cameraTimerRow{display:flex;justify-content:center;gap:7px;margin-bottom:15px}.cameraTimerBtn{backdrop-filter:blur(12px);}
-  .cameraCaptureRow{display:flex;align-items:center;justify-content:center;gap:20px}.cameraShutter{width:78px;height:78px;border-radius:50%;border:4px solid #fff;background:transparent;padding:4px;box-shadow:0 0 0 1px rgba(70,213,196,.4),0 0 28px rgba(70,213,196,.16);cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}.cameraShutter:hover{transform:scale(1.04);box-shadow:0 0 0 1px rgba(70,213,196,.7),0 0 34px rgba(70,213,196,.24)}.cameraShutter span{display:block;width:100%;height:100%;border-radius:50%;background:#fff;transition:background .15s ease}.cameraShutter:hover span{background:var(--accent)}
+  .cameraCaptureRow{display:flex;align-items:center;justify-content:center;gap:20px}.cameraShutter{width:78px;height:78px;border-radius:50%;border:4px solid #fff;background:transparent;padding:4px;box-shadow:0 0 0 1px rgba(70,213,196,.4),0 0 28px rgba(70,213,196,.16);cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}.cameraShutter:hover{transform:scale(1.04);box-shadow:0 0 0 1px rgba(70,213,196,.7),0 0 34px rgba(70,213,196,.24)}.cameraShutter span{display:block;width:100%;height:100%;border-radius:50%;background:#fff;transition:background .15s ease}.cameraShutter:hover > span:not(.ui-hover-glow){background:var(--accent)}
   .cameraCountdownBig{position:absolute;inset:0;display:none;align-items:center;justify-content:center;color:#fff;font-family:'Space Grotesk',sans-serif;font-size:110px;font-weight:700;text-shadow:0 4px 40px rgba(0,0,0,.7);pointer-events:none;z-index:4}
   .countdownPop{animation:countdownPop .75s ease both}@keyframes countdownPop{from{transform:scale(1.45);opacity:0}35%{opacity:1}to{transform:scale(1);opacity:.9}}
   @media(max-width:650px){.radarWrap{grid-template-columns:1fr}.radarLegend{grid-template-columns:repeat(3,1fr)}.profileGrid{grid-template-columns:1fr 1fr}.hdr .tag{display:none}}
@@ -392,6 +398,62 @@ let state = {
 };
 
 /* ------------------------------------------------------------------ */
+/* LOCAL PERSISTENCE                                                    */
+/* Saves profile + AI results in this browser so reload/return keeps    */
+/* the user's data. IndexedDB is used for larger result/photo payloads. */
+/* ------------------------------------------------------------------ */
+const PERSIST_DB = "AIPhysiqueAnalyzerDB";
+const PERSIST_STORE = "appState";
+const PERSIST_KEY = "currentUser";
+let persistReady = false;
+let persistTimer = null;
+function serializableState(){
+  return {profile:state.profile,modules:state.modules,advancedMode:!!state.advancedMode,savedAt:new Date().toISOString()};
+}
+function persistFallback(){
+  try{localStorage.setItem("AI_PHYSIQUE_ANALYZER_STATE",JSON.stringify(serializableState()));}catch(err){console.warn("Không thể lưu dữ liệu cục bộ",err);}
+}
+function persistState(){
+  clearTimeout(persistTimer);
+  persistTimer=setTimeout(()=>{
+    if(!persistReady || !window.indexedDB){persistFallback();return;}
+    try{
+      const req=indexedDB.open(PERSIST_DB,1);
+      req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(PERSIST_STORE))req.result.createObjectStore(PERSIST_STORE);};
+      req.onsuccess=()=>{const db=req.result;const tx=db.transaction(PERSIST_STORE,"readwrite");tx.objectStore(PERSIST_STORE).put(serializableState(),PERSIST_KEY);tx.oncomplete=()=>db.close();};
+      req.onerror=()=>persistFallback();
+    }catch(err){persistFallback();}
+  },100);
+}
+function readFallback(){try{const raw=localStorage.getItem("AI_PHYSIQUE_ANALYZER_STATE");return raw?JSON.parse(raw):null;}catch{return null;}}
+function applyPersistedData(data){
+  if(data?.profile)state.profile=data.profile;
+  if(data?.modules&&typeof data.modules==="object")state.modules=data.modules;
+  if(typeof data?.advancedMode==="boolean")state.advancedMode=data.advancedMode;
+  state.view=state.profile?"dashboard":"profile";state.activeModule=null;state.shots={};state.analyzing=false;state.analyzeStage=-1;
+}
+function loadPersistedState(){
+  const fallback=readFallback();
+  if(!window.indexedDB){applyPersistedData(fallback);render();return;}
+  try{
+    const req=indexedDB.open(PERSIST_DB,1);
+    req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(PERSIST_STORE))req.result.createObjectStore(PERSIST_STORE);};
+    req.onsuccess=()=>{
+      const db=req.result;const getReq=db.transaction(PERSIST_STORE,"readonly").objectStore(PERSIST_STORE).get(PERSIST_KEY);
+      getReq.onsuccess=()=>{persistReady=true;applyPersistedData(getReq.result||fallback);db.close();render();};
+      getReq.onerror=()=>{persistReady=true;applyPersistedData(fallback);db.close();render();};
+    };
+    req.onerror=()=>{applyPersistedData(fallback);render();};
+  }catch{applyPersistedData(fallback);render();}
+}
+function clearSavedUserData(){
+  if(!confirm("Xóa toàn bộ hồ sơ và kết quả AI đã lưu trên trình duyệt này?"))return;
+  try{localStorage.removeItem("AI_PHYSIQUE_ANALYZER_STATE");}catch{}
+  try{const req=indexedDB.open(PERSIST_DB,1);req.onsuccess=()=>{const db=req.result;const tx=db.transaction(PERSIST_STORE,"readwrite");tx.objectStore(PERSIST_STORE).delete(PERSIST_KEY);tx.oncomplete=()=>db.close();};}catch{}
+  state.profile=null;state.modules={};state.shots={};state.view="profile";state.activeModule=null;render();showToast("Đã xóa dữ liệu đã lưu trên thiết bị.");
+}
+
+/* ------------------------------------------------------------------ */
 /* HELPERS                                                              */
 /* ------------------------------------------------------------------ */
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -547,6 +609,19 @@ function render(){
   else if(state.view==="dashboard") screen.innerHTML = renderDashboard();
   else if(state.view==="capture") screen.innerHTML = renderCapture();
   else if(state.view==="result") screen.innerHTML = renderResult();
+  wireButtonHoverEffects();
+  persistState();
+}
+
+/* Generic cursor-following glow for every clickable button in the app. */
+function wireButtonHoverEffects(){
+  document.querySelectorAll(".tapbtn").forEach(btn=>{
+    if(btn.querySelector(":scope > .ui-hover-glow"))return;
+    const glow=document.createElement("span");glow.className="ui-hover-glow";btn.insertBefore(glow,btn.firstChild);
+    btn.addEventListener("pointerenter",()=>btn.classList.add("ui-hover-active"));
+    btn.addEventListener("pointerleave",()=>btn.classList.remove("ui-hover-active"));
+    btn.addEventListener("pointermove",e=>{const r=btn.getBoundingClientRect();btn.style.setProperty("--ui-mx",`${e.clientX-r.left}px`);btn.style.setProperty("--ui-my",`${e.clientY-r.top}px`);});
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -751,6 +826,10 @@ function renderDashboard(){
       <div style="font-size:12px;color:var(--dim);line-height:1.7;">
         Ảnh 2D chỉ ghi lại bề mặt, không đo được chiều sâu và khối lượng cơ thực. Vì vậy, thay vì chỉ "nhìn ảnh", hệ thống <b style="color:var(--text);">tái tạo mô hình cơ thể 3D</b> từ ảnh chụp, phân tích <b style="color:var(--text);">động lực học cơ bắp</b> để suy luận khối lượng cơ thực tế. Điểm số được chấm theo <b style="color:var(--text);">tỷ lệ tương đối</b> — so sánh cân đối giữa các nhóm cơ với ${ELITE_BENCHMARK.label} — chứ không chấm tuyệt đối theo pixel ảnh, nên ít bị ảnh hưởng bởi góc chụp, ánh sáng hay pose. Bóng ma/icon vẫn chỉ mang tính <b style="color:var(--text);">tham khảo</b>.
       </div>
+    </div>
+    <div class="card" style="margin-bottom:14px;padding:13px 14px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <div style="min-width:0;"><div class="sg" style="font-size:12px;font-weight:700;">💾 Dữ liệu được lưu trên thiết bị</div><div style="font-size:11px;color:var(--dim);margin-top:3px;line-height:1.45;">Hồ sơ và kết quả AI sẽ được giữ lại khi bạn đóng rồi mở lại trình duyệt này.</div></div>
+      <button class="tapbtn" onclick="clearSavedUserData()" style="padding:8px 10px;border-radius:9px;border:1px solid rgba(232,101,74,.35);background:rgba(232,101,74,.08);color:var(--bad);font-size:11px;white-space:nowrap;">Xóa dữ liệu</button>
     </div>
     <div style="font-size:11px;color:var(--dim2);line-height:1.6;padding:0 4px;">
     </div>
@@ -1023,26 +1102,27 @@ function buildCameraOverlay(){
     <div class="cameraChrome"></div>
     <div class="cameraGuide"></div>
     <div class="cameraTop">
-      <button type="button" class="cameraRoundBtn" onclick="closeCamera()" aria-label="Đóng camera">✕</button>
-      <button type="button" class="cameraRoundBtn" onclick="flipCamera()" aria-label="Đổi camera">↻</button>
+      <button type="button" class="cameraRoundBtn tapbtn" onclick="closeCamera()" aria-label="Đóng camera">✕</button>
+      <button type="button" class="cameraRoundBtn tapbtn" onclick="flipCamera()" aria-label="Đổi camera">↻</button>
     </div>
     <div id="cameraStatus" class="cameraInfo"></div>
     <div id="cameraCountdown" class="cameraCountdownBig"></div>
     <div class="cameraBottom">
       <div class="cameraTimerRow">
-        <button type="button" class="cameraTimerBtn ${state.cameraTimer===0?'active':''}" onclick="setCameraTimer(0)">Không hẹn</button>
-        <button type="button" class="cameraTimerBtn ${state.cameraTimer===3?'active':''}" onclick="setCameraTimer(3)">3 giây</button>
-        <button type="button" class="cameraTimerBtn ${state.cameraTimer===5?'active':''}" onclick="setCameraTimer(5)">5 giây</button>
+        <button type="button" class="cameraTimerBtn tapbtn ${state.cameraTimer===0?'active':''}" onclick="setCameraTimer(0)">Không hẹn</button>
+        <button type="button" class="cameraTimerBtn tapbtn ${state.cameraTimer===3?'active':''}" onclick="setCameraTimer(3)">3 giây</button>
+        <button type="button" class="cameraTimerBtn tapbtn ${state.cameraTimer===5?'active':''}" onclick="setCameraTimer(5)">5 giây</button>
       </div>
       <div class="cameraCaptureRow">
         <div style="width:42px;"></div>
-        <button type="button" class="cameraShutter" onclick="capturePhoto()" aria-label="Chụp ảnh"><span></span></button>
+        <button type="button" class="cameraShutter tapbtn" onclick="capturePhoto()" aria-label="Chụp ảnh"><span></span></button>
         <div style="width:42px;color:#8A9299;font-size:10px;line-height:1.3;">Ảnh<br>tạm thời</div>
       </div>
       <div style="color:#8A9299;font-size:10px;margin-top:10px;">Căn người vào khung · ảnh chỉ dùng để phân tích</div>
     </div>
   `;
   document.body.appendChild(overlay);
+  wireButtonHoverEffects();
 }
 async function startCameraStream(){
   const statusEl=document.getElementById('cameraStatus');
@@ -1302,8 +1382,8 @@ function deleteModule(k){
   if(wasUnlocked) showToast("🔒 Điểm Body đã bị khóa lại do thiếu dữ liệu module.");
 }
 
-/* init */
-render();
+/* init — restore saved user data before first screen */
+loadPersistedState();
 </script>
 </body>
 </html>
