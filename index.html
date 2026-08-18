@@ -358,10 +358,10 @@ const TIME_TABLE = [
 ];
 
 const PIPELINE_STAGES = [
-  "Tái tạo mô hình cơ thể 3D (SAM 3D Body)",
-  "Phân tích động lực học cơ bắp (MusclePose)",
-  "Phân đoạn từng nhóm cơ (Segmentation)",
-  "So sánh với database VĐV chuyên nghiệp & chấm điểm"
+  "Kiểm tra chất lượng ảnh & tư thế",
+  "Phân tích hình ảnh bằng Gemini AI",
+  "Đánh giá từng nhóm cơ nhìn thấy",
+  "Tổng hợp điểm và độ tin cậy AI"
 ];
 
 const REJECT_REASONS = [
@@ -869,7 +869,8 @@ function renderResult(){
         <span class="mono" style="font-weight:700;color:${scoreColor(s.score)};">${s.score.toFixed(1)} <span style="font-size:10px;color:var(--dim);">(${scoreLabel(s.score)})</span></span>
       </div>
       <div class="barTrack" style="margin-bottom:4px;"><div class="barFill" style="width:${s.score*10}%;background:${scoreColor(s.score)};"></div></div>
-      <div style="font-size:11px;color:var(--accent2);">Phát triển hơn ${s.percentile}% ${genderWord()} cùng cân nặng</div>
+      <div style="font-size:11px;color:var(--accent2);">Độ tin cậy AI: ${s.confidence || 0}%</div>
+      ${s.evidence ? `<div style="font-size:11px;color:var(--dim);line-height:1.5;margin-top:3px;">${s.evidence}</div>` : ""}
     </div>`).join("");
 
   const photosHtml = data.photos.map(p=>`<img src="${p}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--border);margin-right:8px;"/>`).join("");
@@ -1203,27 +1204,80 @@ document.addEventListener('paste', (e)=>{
   }
 });
 
-function runAnalysis(){
+async function runAnalysis(){
   const k=state.activeModule; const mod=MODULES[k];
-  const shotsArr = mod.shots.map((_,i)=>state.shots[i]);
+  const shotsArr = mod.shots.map((_,i)=>state.shots[i]).filter(Boolean);
+  if(!shotsArr.length){ showToast("Vui lòng chụp đủ ảnh trước khi phân tích."); return; }
+
   state.analyzing=true; state.analyzeStage=0; render();
 
-  let stage=0;
-  const stepTimer = setInterval(()=>{
-    stage++;
-    state.analyzeStage=stage;
-    render();
-    if(stage>=PIPELINE_STAGES.length){
-      clearInterval(stepTimer);
-      finishAnalysis(k, shotsArr);
+  try{
+    // Gửi ảnh trực tiếp tới backend của chính app. API key chỉ nằm trên server.
+    const payload = {
+      moduleKey: k,
+      moduleLabel: mod.label,
+      criteria: mod.criteria,
+      subMuscles: mod.subs.map(s=>({key:s.k,label:s.l})),
+      shots: shotsArr.map(s=>({img:s.img, pose:s.pose || "unknown"}))
+    };
+
+    // Chỉ dùng animation như tiến trình hiển thị; kết quả thật đến từ Gemini backend.
+    let stage=0;
+    const stepTimer=setInterval(()=>{
+      stage=Math.min(stage+1, PIPELINE_STAGES.length-1);
+      state.analyzeStage=stage;
+      render();
+    },650);
+
+    const response=await fetch("/api/analyze",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(payload)
+    });
+    const body=await response.json().catch(()=>({error:"Server trả về dữ liệu không hợp lệ."}));
+    clearInterval(stepTimer);
+
+    if(!response.ok || !body.result){
+      throw new Error(body.error || `AI server error (${response.status})`);
     }
-  }, 700);
+
+    const ai=body.result;
+    const subMap=new Map((ai.subs||[]).map(x=>[x.key,x]));
+    const subs=mod.subs.map(s=>{
+      const x=subMap.get(s.k) || {};
+      const score=clamp(Number(x.score)||1,1,10);
+      return {
+        k:s.k,
+        l:s.l,
+        score,
+        confidence:clamp(Math.round(Number(x.confidence)||0),0,100),
+        evidence:x.evidence || "Không có mô tả bổ sung."
+      };
+    });
+
+    const result={
+      score:clamp(Number(ai.score)||1,1,10),
+      subs,
+      comment:ai.comment || "AI đã hoàn tất phân tích hình ảnh.",
+      photos:shotsArr.map(s=>s.img),
+      confidencePct:clamp(Math.round(Number(ai.confidence)||0),0,100),
+      quality:ai.quality || null,
+      measurements:ai.measurements || null,
+      limitations:Array.isArray(ai.limitations)?ai.limitations:[]
+    };
+
+    finishAnalysis(k, shotsArr, result);
+  }catch(err){
+    state.analyzing=false; state.analyzeStage=-1; render();
+    showToast("Không thể phân tích AI: " + (err.message || "Lỗi không xác định"));
+    console.error(err);
+  }
 }
-function finishAnalysis(k, shotsArr){
+function finishAnalysis(k, shotsArr, aiResult){
   const wasUnlockedBefore = bodyUnlocked();
   const isUpdate = !!state.modules[k];
   const prevBodyScore = computeBodyScore();
-  const result = analyzeModule(k, shotsArr);
+  const result = aiResult;
   state.modules[k] = result;
   state.analyzing=false; state.analyzeStage=-1;
   state.view="result";
